@@ -4,135 +4,189 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SCGrab — SoundCloud Downloader</title>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Bebas+Neue&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet">
 <style>
 :root {
-  --sc: #ff5500;
-  --sc2: #ff7733;
-  --sc-glow: rgba(255,85,0,0.2);
-  --bg: #0d0d0d;
-  --card: #161616;
-  --card2: #1f1f1f;
-  --border: #2b2b2b;
-  --text: #f2f2f2;
-  --muted: #666;
-  --green: #1ed760;
-  --red: #ff4444;
-  --yellow: #ffd60a;
+  --sc:      #ff5500;
+  --sc2:     #ff7733;
+  --sc3:     #ff3300;
+  --glow:    rgba(255,85,0,0.18);
+  --glow2:   rgba(255,85,0,0.08);
+  --bg:      #080808;
+  --bg2:     #0f0f0f;
+  --card:    #111111;
+  --card2:   #181818;
+  --card3:   #202020;
+  --border:  #222222;
+  --border2: #2e2e2e;
+  --text:    #f0f0f0;
+  --text2:   #999999;
+  --text3:   #555555;
+  --green:   #00e676;
+  --red:     #ff3d3d;
+  --yellow:  #ffd600;
+  --radius:  14px;
+  --radius-sm: 8px;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
 
 body {
   background: var(--bg);
   color: var(--text);
   font-family: 'DM Sans', sans-serif;
   min-height: 100vh;
-  padding: 0 0 80px;
   overflow-x: hidden;
 }
 
-/* ── HERO HEADER ── */
-.hero {
-  background: linear-gradient(135deg, #1a0800 0%, #0d0d0d 60%);
-  border-bottom: 1px solid var(--border);
-  padding: 48px 24px 40px;
+/* ── NOISE OVERLAY ── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.4;
+}
+
+/* ── HEADER ── */
+.header {
+  position: relative;
+  padding: 56px 24px 48px;
   text-align: center;
+  overflow: hidden;
+}
+
+.header-glow {
+  position: absolute;
+  top: -60px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 700px;
+  height: 400px;
+  background: radial-gradient(ellipse at center, rgba(255,85,0,0.12) 0%, transparent 68%);
+  pointer-events: none;
+}
+
+.header-line {
+  position: absolute;
+  bottom: 0;
+  left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, var(--border2) 20%, var(--sc) 50%, var(--border2) 80%, transparent 100%);
+  opacity: 0.6;
+}
+
+/* waveform */
+.wave {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 3px;
+  height: 32px;
+  margin-bottom: 20px;
+}
+.wb {
+  width: 3px;
+  background: var(--sc);
+  border-radius: 2px 2px 0 0;
+  animation: wv 1.4s ease-in-out infinite;
+  opacity: 0.6;
+}
+.wb:nth-child(1)  { height:8px;  animation-delay:0s; }
+.wb:nth-child(2)  { height:20px; animation-delay:.1s; }
+.wb:nth-child(3)  { height:14px; animation-delay:.2s; }
+.wb:nth-child(4)  { height:28px; animation-delay:.05s; }
+.wb:nth-child(5)  { height:10px; animation-delay:.3s; }
+.wb:nth-child(6)  { height:32px; animation-delay:.15s; opacity:1; }
+.wb:nth-child(7)  { height:18px; animation-delay:.25s; }
+.wb:nth-child(8)  { height:26px; animation-delay:.4s; }
+.wb:nth-child(9)  { height:12px; animation-delay:.35s; }
+.wb:nth-child(10) { height:22px; animation-delay:.08s; }
+.wb:nth-child(11) { height:30px; animation-delay:.45s; opacity:.8; }
+.wb:nth-child(12) { height:16px; animation-delay:.2s; }
+.wb:nth-child(13) { height:8px;  animation-delay:.3s; }
+
+@keyframes wv {
+  0%,100% { transform: scaleY(1); }
+  50%      { transform: scaleY(0.2); }
+}
+
+.logo {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(72px, 14vw, 120px);
+  line-height: 0.9;
+  letter-spacing: 6px;
+  color: var(--text);
+  position: relative;
+  display: inline-block;
+}
+.logo span {
+  color: var(--sc);
+  text-shadow: 0 0 40px rgba(255,85,0,0.5);
+}
+
+.tagline {
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  color: var(--text3);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  margin-top: 12px;
+}
+.tagline em {
+  color: var(--sc);
+  font-style: normal;
+}
+
+/* ── MAIN LAYOUT ── */
+.container {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 36px 20px 100px;
+  position: relative;
+  z-index: 1;
+}
+
+/* ── SEARCH CARD ── */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  padding: 24px;
   position: relative;
   overflow: hidden;
 }
 
-.hero::before {
+.card::before {
   content: '';
   position: absolute;
-  top: -80px; left: 50%; transform: translateX(-50%);
-  width: 600px; height: 300px;
-  background: radial-gradient(ellipse, rgba(255,85,0,0.15) 0%, transparent 70%);
-  pointer-events: none;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border2) 30%, var(--border2) 70%, transparent);
 }
 
-/* Animated waveform bars in hero */
-.wave-row {
+.card-label {
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--sc);
+  margin-bottom: 14px;
   display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  gap: 4px;
-  height: 40px;
-  margin-bottom: 24px;
+  align-items: center;
+  gap: 8px;
 }
-.wbar {
-  width: 4px;
+.card-label::before {
+  content: '';
+  display: inline-block;
+  width: 6px; height: 6px;
   background: var(--sc);
-  border-radius: 2px;
-  opacity: 0.7;
-  animation: wv 1.2s ease-in-out infinite;
-}
-.wbar:nth-child(1)  { height: 12px; animation-delay: 0s; }
-.wbar:nth-child(2)  { height: 28px; animation-delay: .1s; }
-.wbar:nth-child(3)  { height: 20px; animation-delay: .2s; }
-.wbar:nth-child(4)  { height: 36px; animation-delay: .3s; }
-.wbar:nth-child(5)  { height: 16px; animation-delay: .4s; }
-.wbar:nth-child(6)  { height: 40px; animation-delay: .5s; }
-.wbar:nth-child(7)  { height: 22px; animation-delay: .6s; }
-.wbar:nth-child(8)  { height: 30px; animation-delay: .7s; }
-.wbar:nth-child(9)  { height: 14px; animation-delay: .8s; }
-.wbar:nth-child(10) { height: 26px; animation-delay: .9s; }
-.wbar:nth-child(11) { height: 38px; animation-delay: .5s; }
-.wbar:nth-child(12) { height: 18px; animation-delay: .3s; }
-.wbar:nth-child(13) { height: 32px; animation-delay: .1s; }
-
-@keyframes wv {
-  0%,100% { transform: scaleY(1); }
-  50%      { transform: scaleY(0.3); }
-}
-
-.logo {
-  font-family: 'Syne', sans-serif;
-  font-size: clamp(48px, 10vw, 80px);
-  font-weight: 800;
-  line-height: 1;
-  letter-spacing: -2px;
-  background: linear-gradient(135deg, #ff5500, #ff9944);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  filter: drop-shadow(0 0 30px rgba(255,85,0,0.4));
-}
-
-.logo em {
-  font-style: normal;
-  -webkit-text-fill-color: var(--text);
-  filter: none;
-}
-
-.tagline {
-  font-size: 14px;
-  color: var(--muted);
-  margin-top: 10px;
-  letter-spacing: 0.5px;
-}
-
-/* ── MAIN CONTENT ── */
-.container {
-  max-width: 700px;
-  margin: 0 auto;
-  padding: 0 20px;
-}
-
-/* ── SEARCH CARD ── */
-.search-card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 28px;
-  margin-top: -1px;
-  margin-top: 32px;
-  animation: fadeUp .5s ease both;
-}
-
-@keyframes fadeUp {
-  from { opacity:0; transform:translateY(20px); }
-  to   { opacity:1; transform:translateY(0); }
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--sc);
 }
 
 .url-row {
@@ -142,40 +196,43 @@ body {
 
 .url-input {
   flex: 1;
-  background: var(--card2);
-  border: 1.5px solid var(--border);
-  border-radius: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-sm);
   color: var(--text);
-  font-family: 'DM Sans', sans-serif;
-  font-size: 14px;
-  padding: 14px 18px;
+  font-family: 'Space Mono', monospace;
+  font-size: 12px;
+  padding: 14px 16px;
   outline: none;
   transition: border-color .2s, box-shadow .2s;
+  min-width: 0;
 }
 .url-input:focus {
   border-color: var(--sc);
-  box-shadow: 0 0 0 3px var(--sc-glow);
+  box-shadow: 0 0 0 3px var(--glow);
 }
-.url-input::placeholder { color: var(--muted); }
+.url-input::placeholder { color: var(--text3); }
 
 .fetch-btn {
   background: var(--sc);
   border: none;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   color: #fff;
-  font-family: 'Syne', sans-serif;
-  font-size: 15px;
-  font-weight: 700;
-  padding: 14px 24px;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 18px;
+  letter-spacing: 2px;
+  padding: 0 24px;
   cursor: pointer;
   white-space: nowrap;
   transition: background .15s, transform .1s, box-shadow .2s;
-  letter-spacing: .5px;
+  flex-shrink: 0;
+  height: 48px;
 }
-.fetch-btn:hover { background: var(--sc2); box-shadow: 0 4px 20px var(--sc-glow); transform: translateY(-1px); }
-.fetch-btn:active { transform: translateY(0); }
-.fetch-btn:disabled { background: var(--card2); color: var(--muted); cursor:not-allowed; transform:none; box-shadow:none; }
+.fetch-btn:hover  { background: var(--sc2); box-shadow: 0 4px 24px var(--glow); transform: translateY(-1px); }
+.fetch-btn:active { transform: translateY(0); box-shadow: none; }
+.fetch-btn:disabled { background: var(--card3); color: var(--text3); cursor: not-allowed; transform: none; box-shadow: none; }
 
+/* opts */
 .opts-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -183,13 +240,12 @@ body {
   margin-top: 14px;
 }
 
-.opt-group label {
-  display: block;
-  font-size: 11px;
-  font-weight: 600;
+.opt-label {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
   letter-spacing: 2px;
   text-transform: uppercase;
-  color: var(--sc);
+  color: var(--text3);
   margin-bottom: 6px;
 }
 
@@ -199,16 +255,16 @@ body {
   position: absolute;
   right: 12px; top: 50%;
   transform: translateY(-50%);
-  color: var(--muted);
-  font-size: 11px;
+  color: var(--text3);
+  font-size: 10px;
   pointer-events: none;
 }
 
 select {
   width: 100%;
-  background: var(--card2);
-  border: 1.5px solid var(--border);
-  border-radius: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-sm);
   color: var(--text);
   font-family: 'DM Sans', sans-serif;
   font-size: 13px;
@@ -220,100 +276,196 @@ select {
 }
 select:focus { border-color: var(--sc); }
 
-/* ── LOADING ── */
-#loading {
+/* proxy warning banner */
+.proxy-banner {
   display: none;
-  text-align: center;
-  padding: 40px 0;
+  margin-top: 14px;
+  background: rgba(255,85,0,0.08);
+  border: 1px solid rgba(255,85,0,0.25);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  font-size: 12px;
+  color: var(--sc2);
+  line-height: 1.5;
+}
+.proxy-banner strong { color: var(--sc); }
+
+/* ── PROGRESS ── */
+#dl-progress {
+  display: none;
+  margin-top: 20px;
+  background: var(--card);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  padding: 20px 24px;
   animation: fadeUp .3s ease both;
 }
 
-.spinner {
-  width: 36px; height: 36px;
-  border: 3px solid var(--border);
-  border-top-color: var(--sc);
-  border-radius: 50%;
-  animation: spin .7s linear infinite;
-  margin: 0 auto 16px;
+.prog-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
 }
-@keyframes spin { to { transform: rotate(360deg); } }
 
-.loading-text { color: var(--muted); font-size: 14px; }
+.prog-pulse {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--sc);
+  flex-shrink: 0;
+  animation: pulse 1s ease-in-out infinite;
+}
+.prog-pulse.done  { background: var(--green); animation: none; }
+.prog-pulse.error { background: var(--red); animation: none; }
+
+@keyframes pulse {
+  0%,100% { box-shadow: 0 0 0 0 rgba(255,85,0,0.6); }
+  50%      { box-shadow: 0 0 0 6px rgba(255,85,0,0); }
+}
+
+.prog-label {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.prog-pct {
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  color: var(--sc);
+  flex-shrink: 0;
+}
+
+.prog-track {
+  height: 3px;
+  background: var(--card3);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.prog-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--sc3), var(--sc2));
+  border-radius: 2px;
+  transition: width .4s ease;
+  width: 0%;
+  box-shadow: 0 0 8px var(--sc);
+}
+
+.prog-file {
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  color: var(--text3);
+  margin-top: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* error box */
+.error-box {
+  margin-top: 14px;
+  background: rgba(255,61,61,0.08);
+  border: 1px solid rgba(255,61,61,0.25);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  font-size: 12px;
+  color: #ff8080;
+  line-height: 1.55;
+}
 
 /* ── PLAYLIST PANEL ── */
-#playlist-panel { display: none; margin-top: 28px; animation: fadeUp .4s ease both; }
+#playlist-panel {
+  display: none;
+  margin-top: 20px;
+  animation: fadeUp .4s ease both;
+}
 
-.playlist-header {
+.pl-header {
+  background: var(--card);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius) var(--radius) 0 0;
+  padding: 20px;
   display: flex;
   align-items: center;
   gap: 16px;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 16px 16px 0 0;
-  padding: 20px;
-  border-bottom: none;
+  border-bottom: 1px solid var(--border);
 }
 
-.playlist-thumb {
-  width: 64px; height: 64px;
+.pl-thumb {
+  width: 58px; height: 58px;
   border-radius: 8px;
   object-fit: cover;
   flex-shrink: 0;
-  background: var(--card2);
+  background: var(--card3);
 }
-
-.playlist-thumb-placeholder {
-  width: 64px; height: 64px;
+.pl-thumb-placeholder {
+  width: 58px; height: 58px;
   border-radius: 8px;
-  background: var(--card2);
+  background: var(--card3);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 28px;
+  font-size: 24px;
   flex-shrink: 0;
 }
 
-.playlist-meta { flex: 1; min-width: 0; }
-.playlist-title {
-  font-family: 'Syne', sans-serif;
-  font-size: 18px;
-  font-weight: 700;
-  white-space: nowrap;
+.pl-info { flex: 1; min-width: 0; }
+
+.pl-title {
+  font-weight: 600;
+  font-size: 15px;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.playlist-sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+.pl-sub {
+  font-size: 12px;
+  color: var(--text2);
+  margin-top: 3px;
+}
 
 .dl-all-btn {
   background: var(--sc);
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   color: #fff;
-  font-family: 'Syne', sans-serif;
-  font-size: 13px;
-  font-weight: 700;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 16px;
+  letter-spacing: 1.5px;
   padding: 10px 18px;
   cursor: pointer;
-  white-space: nowrap;
   flex-shrink: 0;
-  transition: background .15s, transform .1s;
-  letter-spacing: .5px;
+  transition: background .15s, box-shadow .2s, transform .1s;
 }
-.dl-all-btn:hover { background: var(--sc2); transform: translateY(-1px); }
+.dl-all-btn:hover  { background: var(--sc2); box-shadow: 0 4px 16px var(--glow); transform: translateY(-1px); }
+.dl-all-btn:active { transform: translateY(0); }
 
-/* Track list */
+/* track list */
 .track-list {
   background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 0 0 16px 16px;
+  border: 1px solid var(--border2);
+  border-top: none;
+  border-radius: 0 0 var(--radius) var(--radius);
   overflow: hidden;
+  max-height: 420px;
+  overflow-y: auto;
 }
+
+.track-list::-webkit-scrollbar { width: 4px; }
+.track-list::-webkit-scrollbar-track { background: transparent; }
+.track-list::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
 
 .track-item {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 14px 20px;
+  gap: 12px;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--border);
   transition: background .15s;
 }
@@ -321,278 +473,272 @@ select:focus { border-color: var(--sc); }
 .track-item:hover { background: var(--card2); }
 
 .track-num {
-  width: 28px;
-  text-align: center;
-  font-size: 13px;
-  color: var(--muted);
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  color: var(--text3);
+  width: 20px;
+  text-align: right;
   flex-shrink: 0;
-  font-variant-numeric: tabular-nums;
 }
 
 .track-thumb {
-  width: 42px; height: 42px;
+  width: 38px; height: 38px;
   border-radius: 6px;
   object-fit: cover;
   flex-shrink: 0;
-  background: var(--card2);
+  background: var(--card3);
 }
-
 .track-thumb-placeholder {
-  width: 42px; height: 42px;
+  width: 38px; height: 38px;
   border-radius: 6px;
-  background: var(--card2);
+  background: var(--card3);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
+  font-size: 16px;
   flex-shrink: 0;
 }
 
-.track-info { flex: 1; min-width: 0; }
+.track-info {
+  flex: 1;
+  min-width: 0;
+}
 .track-title {
-  font-size: 14px;
-  font-weight: 600;
-  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.track-artist { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.track-artist {
+  font-size: 11px;
+  color: var(--text2);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .track-dur {
-  font-size: 12px;
-  color: var(--muted);
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  color: var(--text3);
   flex-shrink: 0;
-  font-variant-numeric: tabular-nums;
-  min-width: 36px;
-  text-align: right;
 }
 
 .track-dl-btn {
-  background: transparent;
-  border: 1.5px solid var(--border);
+  width: 30px; height: 30px;
+  background: var(--card3);
+  border: 1px solid var(--border2);
   border-radius: 6px;
-  color: var(--muted);
-  font-size: 16px;
-  width: 34px; height: 34px;
-  display: flex; align-items: center; justify-content: center;
+  color: var(--text2);
+  font-size: 13px;
   cursor: pointer;
   flex-shrink: 0;
-  transition: border-color .15s, color .15s, background .15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s, color .15s, border-color .15s;
 }
-.track-dl-btn:hover { border-color: var(--sc); color: var(--sc); background: var(--sc-glow); }
+.track-dl-btn:hover {
+  background: var(--sc);
+  border-color: var(--sc);
+  color: #fff;
+}
 
-/* ── DOWNLOAD PROGRESS ── */
-#dl-progress {
+/* ── DONE FILES ── */
+#done-files {
   display: none;
+  margin-top: 20px;
   background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 24px;
-  margin-top: 24px;
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  overflow: hidden;
   animation: fadeUp .3s ease both;
 }
 
-.progress-top {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 14px;
-}
-
-.prog-dot {
-  width: 10px; height: 10px;
-  border-radius: 50%;
-  background: var(--sc);
-  animation: pulse 1s ease infinite;
-  flex-shrink: 0;
-}
-.prog-dot.done  { background: var(--green); animation: none; }
-.prog-dot.error { background: var(--red);   animation: none; }
-
-@keyframes pulse {
-  0%,100% { opacity:1; transform:scale(1); }
-  50%      { opacity:.4; transform:scale(.6); }
-}
-
-.prog-label {
-  font-size: 14px;
-  font-weight: 600;
-  flex: 1;
-}
-
-.prog-pct {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--sc);
-  min-width: 40px;
-  text-align: right;
-}
-
-.prog-track { height: 6px; background: var(--card2); border-radius: 3px; overflow: hidden; }
-.prog-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--sc), var(--sc2));
-  border-radius: 3px;
-  transition: width .5s ease;
-  box-shadow: 0 0 10px var(--sc-glow);
-}
-
-.prog-file {
-  font-size: 12px;
-  color: var(--muted);
-  margin-top: 10px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Done files */
-#done-files { display: none; margin-top: 20px; }
-
-.done-title {
-  font-size: 11px;
-  font-weight: 700;
+.done-header {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
   letter-spacing: 2px;
   text-transform: uppercase;
   color: var(--green);
-  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.done-header::before {
+  content: '✓';
+  font-size: 12px;
 }
 
 .done-item {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 11px 14px;
-  background: var(--card2);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  margin-bottom: 8px;
-  animation: fadeUp .3s ease both;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  transition: background .15s;
 }
+.done-item:hover { background: var(--card2); }
 
-.done-icon { font-size: 16px; flex-shrink: 0; }
-.done-name { flex: 1; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.done-icon { font-size: 18px; flex-shrink: 0; }
+
+.done-name {
+  flex: 1;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text2);
+}
 
 .save-btn {
-  background: none;
-  border: 1.5px solid var(--sc);
-  border-radius: 6px;
-  color: var(--sc);
-  font-family: 'DM Sans', sans-serif;
-  font-size: 12px;
-  font-weight: 600;
+  background: transparent;
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-sm);
+  color: var(--text2);
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 1px;
   padding: 6px 14px;
   cursor: pointer;
-  white-space: nowrap;
-  transition: background .15s, color .15s;
+  transition: all .15s;
+  flex-shrink: 0;
+  text-transform: uppercase;
 }
-.save-btn:hover { background: var(--sc); color: #fff; }
+.save-btn:hover {
+  background: var(--sc);
+  border-color: var(--sc);
+  color: #fff;
+}
 
 .zip-btn {
-  width: 100%;
-  padding: 14px;
-  background: rgba(255,85,0,0.1);
-  border: 1.5px solid var(--sc);
-  border-radius: 10px;
-  color: var(--sc);
-  font-family: 'Syne', sans-serif;
+  display: block;
+  width: calc(100% - 40px);
+  margin: 14px 20px;
+  background: var(--card3);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: 'Bebas Neue', sans-serif;
   font-size: 16px;
-  font-weight: 700;
-  letter-spacing: .5px;
-  cursor: pointer;
-  margin-top: 10px;
-  transition: background .15s, color .15s;
-}
-.zip-btn:hover { background: var(--sc); color: #fff; }
-
-.error-box {
-  background: rgba(255,68,68,0.08);
-  border: 1px solid rgba(255,68,68,0.3);
-  border-radius: 8px;
+  letter-spacing: 2px;
   padding: 14px;
-  font-size: 13px;
-  color: var(--red);
-  margin-top: 14px;
-  line-height: 1.5;
+  cursor: pointer;
+  text-align: center;
+  transition: all .15s;
 }
-
-/* ── BUY ME A COFFEE ── */
-.bmc-fab {
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
-  z-index: 100;
-  text-decoration: none;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--yellow);
-  border-radius: 50px;
-  padding: 12px 18px;
-  font-family: 'Syne', sans-serif;
-  font-size: 14px;
-  font-weight: 700;
-  color: #1a1a00;
-  box-shadow: 0 4px 20px rgba(255,214,10,0.35);
-  transition: transform .2s, box-shadow .2s;
-  animation: fadeUp .6s .5s ease both;
+.zip-btn:hover {
+  background: var(--sc);
+  border-color: var(--sc);
+  box-shadow: 0 4px 20px var(--glow);
 }
-.bmc-fab:hover {
-  transform: translateY(-3px) scale(1.03);
-  box-shadow: 0 8px 28px rgba(255,214,10,0.45);
-}
-.bmc-fab .bmc-icon { font-size: 18px; }
 
 /* ── FOOTER ── */
 footer {
   text-align: center;
-  padding: 40px 20px 20px;
-  font-size: 12px;
-  color: var(--muted);
+  padding: 32px 20px;
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  color: var(--text3);
+  letter-spacing: 1.5px;
 }
-footer a { color: var(--sc); text-decoration: none; }
+footer a { color: var(--text3); text-decoration: none; transition: color .15s; }
+footer a:hover { color: var(--sc); }
+
+/* ── ANIMATIONS ── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── UTILS ── */
+.shake {
+  animation: shake .4s ease;
+}
+@keyframes shake {
+  0%,100% { transform: translateX(0); }
+  20%      { transform: translateX(-6px); }
+  60%      { transform: translateX(6px); }
+}
 </style>
 </head>
 <body>
 
-<div style="position: absolute; top: 20px; right: 24px; font-size: 12px; color: var(--muted); font-weight: 600; letter-spacing: 1px; z-index: 100;">Made by Alexander Roper</div>
-
-<!-- Hero -->
-<div class="hero">
-  <div class="wave-row">
-    <div class="wbar"></div><div class="wbar"></div><div class="wbar"></div>
-    <div class="wbar"></div><div class="wbar"></div><div class="wbar"></div>
-    <div class="wbar"></div><div class="wbar"></div><div class="wbar"></div>
-    <div class="wbar"></div><div class="wbar"></div><div class="wbar"></div>
-    <div class="wbar"></div>
+<header class="header">
+  <div class="header-glow"></div>
+  <div class="wave">
+    <div class="wb"></div><div class="wb"></div><div class="wb"></div>
+    <div class="wb"></div><div class="wb"></div><div class="wb"></div>
+    <div class="wb"></div><div class="wb"></div><div class="wb"></div>
+    <div class="wb"></div><div class="wb"></div><div class="wb"></div>
+    <div class="wb"></div>
   </div>
-  <div class="logo">SC<em>Grab</em></div>
-  <div class="tagline">Download SoundCloud playlists &amp; tracks instantly</div>
-</div>
+  <div class="logo">SC<span>GRAB</span></div>
+  <div class="tagline">Download from SoundCloud &mdash; <em>fast &amp; free</em></div>
+  <div class="header-line"></div>
+</header>
 
-<div class="container">
+<main class="container">
 
   <!-- Search card -->
-  <div class="search-card">
+  <div class="card" style="animation: fadeUp .5s ease both;">
+    <div class="card-label">SoundCloud URL</div>
     <div class="url-row">
-      <input class="url-input" id="url" type="text"
-        placeholder="Paste a SoundCloud URL — track or playlist…"
-        autocomplete="off">
-      <button class="fetch-btn" id="fetch-btn" onclick="fetchPlaylist()">Load →</button>
+      <input
+        id="url"
+        class="url-input"
+        type="url"
+        placeholder="https://soundcloud.com/artist/track-or-playlist"
+        autocomplete="off"
+        spellcheck="false"
+      >
+      <button class="fetch-btn" id="fetch-btn" onclick="fetchPlaylist()">FETCH</button>
     </div>
-    <input type="hidden" id="format" value="mp3">
-    <input type="hidden" id="quality" value="192">
+
+    <div class="opts-row">
+      <div>
+        <div class="opt-label">Format</div>
+        <div class="sel-wrap">
+          <select id="format">
+            <option value="mp3">MP3</option>
+            <option value="wav">WAV</option>
+            <option value="original">Original (m4a/opus)</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <div class="opt-label">Quality</div>
+        <div class="sel-wrap">
+          <select id="quality">
+            <option value="320">320 kbps</option>
+            <option value="192" selected>192 kbps</option>
+            <option value="128">128 kbps</option>
+            <option value="64">64 kbps</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="proxy-banner" id="proxy-banner">
+      <strong>⚠ Geo-block detected.</strong> SoundCloud is blocking this server's IP.
+      Set the <code>PROXY_URL</code> environment variable in your Render dashboard and redeploy.
+      A US/EU residential proxy (e.g. Webshare.io) is recommended.
+    </div>
   </div>
 
   <!-- Progress -->
   <div id="dl-progress">
-    <div class="progress-top">
-      <div class="prog-dot" id="prog-dot"></div>
-      <div class="prog-label" id="prog-label">Preparing download…</div>
+    <div class="prog-top">
+      <div class="prog-pulse" id="prog-dot"></div>
+      <div class="prog-label" id="prog-label">Ready</div>
       <div class="prog-pct" id="prog-pct">0%</div>
     </div>
     <div class="prog-track">
-      <div class="prog-fill" id="prog-fill" style="width:0%"></div>
+      <div class="prog-fill" id="prog-fill"></div>
     </div>
     <div class="prog-file" id="prog-file"></div>
     <div id="error-box-wrap"></div>
@@ -600,33 +746,28 @@ footer a { color: var(--sc); text-decoration: none; }
 
   <!-- Playlist panel -->
   <div id="playlist-panel">
-    <div class="playlist-header">
-      <div id="playlist-thumb-wrap"></div>
-      <div class="playlist-meta">
-        <div class="playlist-title" id="playlist-title"></div>
-        <div class="playlist-sub" id="playlist-sub"></div>
+    <div class="pl-header">
+      <div id="pl-thumb-wrap"></div>
+      <div class="pl-info">
+        <div class="pl-title" id="pl-title"></div>
+        <div class="pl-sub" id="pl-sub"></div>
       </div>
-      <button class="dl-all-btn" id="dl-all-btn" onclick="downloadAll()">⬇ Download All</button>
+      <button class="dl-all-btn" id="dl-all-btn" onclick="downloadAll()">↓ ALL</button>
     </div>
     <div class="track-list" id="track-list"></div>
   </div>
 
   <!-- Done files -->
   <div id="done-files">
-    <div class="done-title">✓ Ready to save</div>
+    <div class="done-header">Downloads ready</div>
     <div id="done-container"></div>
   </div>
 
-</div>
-
-<!-- Buy Me a Coffee FAB -->
-<a class="bmc-fab" href="https://buymeacoffee.com/zillioncart" target="_blank" rel="noopener">
-  <span class="bmc-icon">☕</span> Buy me a coffee
-</a>
+</main>
 
 <footer>
-  Files auto-delete after 10 min &nbsp;·&nbsp; Personal use only &nbsp;·&nbsp;
   Powered by <a href="https://github.com/yt-dlp/yt-dlp" target="_blank">yt-dlp</a>
+  &nbsp;·&nbsp; for personal use only
 </footer>
 
 <script>
@@ -634,7 +775,7 @@ let playlistData = null;
 let currentJobId = null;
 let pollInterval = null;
 
-// ── Helpers ──────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────
 function fmtDur(secs) {
   if (!secs) return '';
   const m = Math.floor(secs / 60);
@@ -642,11 +783,17 @@ function fmtDur(secs) {
   return `${m}:${s}`;
 }
 
-function thumbEl(url, size, isPlaylist) {
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function thumbEl(url, isPlaylist) {
   if (url) {
     const img = document.createElement('img');
     img.src = url;
-    img.className = isPlaylist ? 'playlist-thumb' : 'track-thumb';
+    img.className = isPlaylist ? 'pl-thumb' : 'track-thumb';
     img.onerror = () => img.replaceWith(placeholderEl(isPlaylist));
     return img;
   }
@@ -655,43 +802,50 @@ function thumbEl(url, size, isPlaylist) {
 
 function placeholderEl(isPlaylist) {
   const d = document.createElement('div');
-  d.className = isPlaylist ? 'playlist-thumb-placeholder' : 'track-thumb-placeholder';
+  d.className = isPlaylist ? 'pl-thumb-placeholder' : 'track-thumb-placeholder';
   d.textContent = '🎵';
   return d;
+}
+
+function isGeoError(msg) {
+  if (!msg) return false;
+  const m = msg.toLowerCase();
+  return m.includes('no files') || m.includes('geo') || m.includes('blocked')
+    || m.includes('403') || m.includes('not available') || m.includes('proxy');
 }
 
 // ── Fetch playlist ────────────────────────────────────────────────────────
 async function fetchPlaylist() {
   const url = document.getElementById('url').value.trim();
-  if (!url) { shake(document.getElementById('url')); return; }
+  if (!url) {
+    shake(document.getElementById('url'));
+    return;
+  }
 
   document.getElementById('fetch-btn').disabled = true;
   document.getElementById('playlist-panel').style.display = 'none';
-  document.getElementById('dl-progress').style.display = 'none';
   document.getElementById('done-files').style.display = 'none';
-  
-  // Use progress UI for fetching metadata since it can take time
+  document.getElementById('proxy-banner').style.display = 'none';
   clearInterval(pollInterval);
+
   const prog = document.getElementById('dl-progress');
   prog.style.display = 'block';
-  prog.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+  prog.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   document.getElementById('error-box-wrap').innerHTML = '';
-  setProgress('loading', `Fetching metadata...`, 0, 'This might take a minute for large playlists');
+  setProgress('loading', 'Fetching metadata…', 0, 'This may take a moment for large playlists');
 
   try {
     const res = await fetch('/api/fetch-playlist', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({url})
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
     });
     const data = await res.json();
-    
     if (data.error) {
       showError(data.error);
       document.getElementById('fetch-btn').disabled = false;
       return;
     }
-
     currentJobId = data.job_id;
     pollInterval = setInterval(pollStatus, 1000);
   } catch(e) {
@@ -701,27 +855,28 @@ async function fetchPlaylist() {
 }
 
 function renderPlaylist(data) {
-  // Header
-  document.getElementById('playlist-title').textContent = data.title;
-  document.getElementById('playlist-sub').textContent =
+  document.getElementById('pl-title').textContent = data.title;
+  document.getElementById('pl-sub').textContent =
     `${data.uploader ? data.uploader + ' · ' : ''}${data.count} track${data.count !== 1 ? 's' : ''}`;
 
-  const thumbWrap = document.getElementById('playlist-thumb-wrap');
-  thumbWrap.innerHTML = '';
-  thumbWrap.appendChild(thumbEl(data.thumbnail, 64, true));
+  const wrap = document.getElementById('pl-thumb-wrap');
+  wrap.innerHTML = '';
+  wrap.appendChild(thumbEl(data.thumbnail, true));
 
-  // Hide "Download All" button if single track
   document.getElementById('dl-all-btn').style.display = data.count > 1 ? '' : 'none';
 
-  // Track list
   const list = document.getElementById('track-list');
   list.innerHTML = '';
 
   data.tracks.forEach((track, i) => {
     const item = document.createElement('div');
     item.className = 'track-item';
-    item.innerHTML = `<div class="track-num">${i + 1}</div>`;
-    item.appendChild(thumbEl(track.thumbnail, 42, false));
+
+    const num = document.createElement('div');
+    num.className = 'track-num';
+    num.textContent = i + 1;
+    item.appendChild(num);
+    item.appendChild(thumbEl(track.thumbnail, false));
 
     const info = document.createElement('div');
     info.className = 'track-info';
@@ -739,8 +894,8 @@ function renderPlaylist(data) {
     const btn = document.createElement('button');
     btn.className = 'track-dl-btn';
     btn.title = 'Download this track';
-    btn.textContent = '⬇';
-    btn.onclick = () => downloadTracks([track.url], `Track ${i+1}`);
+    btn.innerHTML = '↓';
+    btn.onclick = () => downloadTracks([track.url], `Track ${i + 1}`);
     item.appendChild(btn);
 
     list.appendChild(item);
@@ -760,21 +915,22 @@ async function downloadTracks(urls, label) {
   const fmt = document.getElementById('format').value;
   const quality = document.getElementById('quality').value;
 
-  // Reset progress UI
   clearInterval(pollInterval);
-  const prog = document.getElementById('dl-progress');
-  prog.style.display = 'block';
-  prog.scrollIntoView({behavior: 'smooth', block: 'nearest'});
   document.getElementById('done-files').style.display = 'none';
   document.getElementById('done-container').innerHTML = '';
   document.getElementById('error-box-wrap').innerHTML = '';
+  document.getElementById('proxy-banner').style.display = 'none';
+
+  const prog = document.getElementById('dl-progress');
+  prog.style.display = 'block';
+  prog.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   setProgress('loading', `Starting: ${label}`, 0, '');
 
   try {
     const res = await fetch('/api/download', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({urls, format: fmt, quality})
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ urls, format: fmt, quality }),
     });
     const data = await res.json();
     if (data.error) { setProgress('error', data.error, 0, ''); return; }
@@ -785,15 +941,22 @@ async function downloadTracks(urls, label) {
   }
 }
 
+// ── Poll ──────────────────────────────────────────────────────────────────
 async function pollStatus() {
   try {
     const res = await fetch(`/api/status/${currentJobId}`);
     const data = await res.json();
 
+    if (data.error && !data.status) {
+      clearInterval(pollInterval);
+      showError(data.error);
+      document.getElementById('fetch-btn').disabled = false;
+      return;
+    }
+
     if (data.type === 'info') {
       if (data.status === 'downloading') {
-        // Still fetching info
-        setProgress('loading', `Fetching metadata...`, 50, 'This might take a minute for large playlists');
+        setProgress('loading', 'Fetching metadata…', 50, 'Parsing playlist tracks');
       } else if (data.status === 'done') {
         clearInterval(pollInterval);
         document.getElementById('dl-progress').style.display = 'none';
@@ -802,41 +965,54 @@ async function pollStatus() {
         document.getElementById('fetch-btn').disabled = false;
       } else if (data.status === 'error') {
         clearInterval(pollInterval);
-        setProgress('error', data.error || 'Unknown error', 0, '');
+        showError(data.error || 'Unknown error');
         document.getElementById('fetch-btn').disabled = false;
       }
       return;
     }
 
     if (data.status === 'downloading') {
-      setProgress('loading', `Downloading… (${data.file_names.length > 0 ? data.file_names.length + ' done' : 'starting'})`, data.progress, data.current_file);
-
+      const doneCount = data.file_names.length;
+      setProgress(
+        'loading',
+        `Downloading… ${doneCount > 0 ? `(${doneCount} done)` : 'starting'}`,
+        data.progress,
+        data.current_file
+      );
     } else if (data.status === 'done') {
       clearInterval(pollInterval);
       setProgress('done', 'Download complete!', 100, '');
       showDoneFiles(data.file_names, data.has_zip);
-
     } else if (data.status === 'error') {
       clearInterval(pollInterval);
-      setProgress('error', data.error || 'Unknown error', 0, '');
+      showError(data.error || 'Unknown error');
     }
   } catch(e) {
     clearInterval(pollInterval);
-    setProgress('error', 'Lost connection to server', 0, '');
+    setProgress('error', `Connection error: ${e.message}`, 0, '');
   }
 }
 
+// ── UI helpers ────────────────────────────────────────────────────────────
 function setProgress(state, label, pct, file) {
   const dot = document.getElementById('prog-dot');
-  dot.className = 'prog-dot' + (state === 'done' ? ' done' : state === 'error' ? ' error' : '');
+  dot.className = 'prog-pulse' + (state === 'done' ? ' done' : state === 'error' ? ' error' : '');
   document.getElementById('prog-label').textContent = label;
   document.getElementById('prog-pct').textContent = pct + '%';
   document.getElementById('prog-fill').style.width = pct + '%';
   document.getElementById('prog-file').textContent = file ? `↓ ${file}` : '';
+}
 
-  if (state === 'error') {
-    const wrap = document.getElementById('error-box-wrap');
-    wrap.innerHTML = `<div class="error-box">${escHtml(label)}</div>`;
+function showError(msg) {
+  const prog = document.getElementById('dl-progress');
+  prog.style.display = 'block';
+  setProgress('error', 'Error', 0, '');
+  document.getElementById('error-box-wrap').innerHTML =
+    `<div class="error-box">${escHtml(msg)}</div>`;
+
+  // Show proxy hint if it looks like a geo-block
+  if (isGeoError(msg)) {
+    document.getElementById('proxy-banner').style.display = 'block';
   }
 }
 
@@ -845,7 +1021,7 @@ function showDoneFiles(names, hasZip) {
   const panel = document.getElementById('done-files');
   container.innerHTML = '';
   panel.style.display = 'block';
-  panel.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
   names.forEach((name, i) => {
     const item = document.createElement('div');
@@ -859,7 +1035,7 @@ function showDoneFiles(names, hasZip) {
   if (hasZip && names.length > 1) {
     const zipBtn = document.createElement('button');
     zipBtn.className = 'zip-btn';
-    zipBtn.textContent = '⬇ Download All as ZIP';
+    zipBtn.textContent = '↓  Download All as ZIP';
     zipBtn.onclick = dlZip;
     container.appendChild(zipBtn);
   }
@@ -868,20 +1044,11 @@ function showDoneFiles(names, hasZip) {
 function dlFile(i) { window.location.href = `/api/download-file/${currentJobId}/${i}`; }
 function dlZip()   { window.location.href = `/api/download-zip/${currentJobId}`; }
 
-// ── Misc ──────────────────────────────────────────────────────────────────
-function showError(msg) {
-  const prog = document.getElementById('dl-progress');
-  prog.style.display = 'block';
-  setProgress('error', msg, 0, '');
-}
-
 function shake(el) {
-  el.style.borderColor = 'var(--red)';
-  setTimeout(() => { el.style.borderColor = ''; }, 900);
-}
-
-function escHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  el.classList.remove('shake');
+  void el.offsetWidth;
+  el.classList.add('shake');
+  setTimeout(() => el.classList.remove('shake'), 500);
 }
 
 document.getElementById('url').addEventListener('keydown', e => {

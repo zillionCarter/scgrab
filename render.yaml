@@ -2,8 +2,10 @@ services:
   - type: web
     name: scgrab
     runtime: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 300
+    buildCommand: apt-get install -y ffmpeg && pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 300
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
+      - key: PROXY_URL
+        value: http://jvseuliv:nep58cmczsp1@198.23.239.134:6540
