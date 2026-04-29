@@ -3,7 +3,6 @@ import uuid
 import threading
 import time
 import zipfile
-import sqlite3
 import json
 from flask import Flask, request, jsonify, send_file, render_template
 import yt_dlp
@@ -13,58 +12,31 @@ app = Flask(__name__)
 DOWNLOAD_DIR = os.path.join(os.path.dirname(__file__), 'downloads')
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
-DB_PATH = os.path.join(os.path.dirname(__file__), 'jobs.db')
-_db_lock = threading.Lock()
-
-
-# ── DB helpers ────────────────────────────────────────────────────────────
-
-def db_init():
-    with sqlite3.connect(DB_PATH) as con:
-        con.execute('''
-            CREATE TABLE IF NOT EXISTS jobs (
-                id TEXT PRIMARY KEY,
-                data TEXT NOT NULL
-            )
-        ''')
-        con.commit()
-
-db_init()
+# Shared in-memory job store — safe with single worker + gthread
+jobs = {}
+jobs_lock = threading.Lock()
 
 
 def job_get(job_id):
-    with _db_lock:
-        with sqlite3.connect(DB_PATH) as con:
-            row = con.execute('SELECT data FROM jobs WHERE id=?', (job_id,)).fetchone()
-    if row:
-        return json.loads(row[0])
-    return None
+    with jobs_lock:
+        return dict(jobs.get(job_id, {})) or None
 
 
 def job_set(job_id, data):
-    with _db_lock:
-        with sqlite3.connect(DB_PATH) as con:
-            con.execute(
-                'INSERT OR REPLACE INTO jobs (id, data) VALUES (?, ?)',
-                (job_id, json.dumps(data))
-            )
-            con.commit()
+    with jobs_lock:
+        jobs[job_id] = data
 
 
 def job_update(job_id, **kwargs):
-    data = job_get(job_id) or {}
-    data.update(kwargs)
-    job_set(job_id, data)
+    with jobs_lock:
+        if job_id in jobs:
+            jobs[job_id].update(kwargs)
 
 
 def job_delete(job_id):
-    with _db_lock:
-        with sqlite3.connect(DB_PATH) as con:
-            con.execute('DELETE FROM jobs WHERE id=?', (job_id,))
-            con.commit()
+    with jobs_lock:
+        jobs.pop(job_id, None)
 
-
-# ── Utilities ─────────────────────────────────────────────────────────────
 
 def get_proxy():
     return os.environ.get('PROXY_URL') or None
@@ -90,8 +62,6 @@ def cleanup_job(job_id, delay=300):
     threading.Thread(target=_cleanup, daemon=True).start()
 
 
-# ── Download worker ───────────────────────────────────────────────────────
-
 def run_download(job_id, urls, quality, fmt):
     job_dir = os.path.join(DOWNLOAD_DIR, job_id)
     os.makedirs(job_dir, exist_ok=True)
@@ -105,14 +75,6 @@ def run_download(job_id, urls, quality, fmt):
                 progress=percent,
                 current_file=os.path.basename(d.get('filename', ''))
             )
-        elif d['status'] == 'finished':
-            filepath = d.get('filename', '')
-            if filepath and os.path.exists(filepath):
-                job = job_get(job_id) or {}
-                files = job.get('files', [])
-                if filepath not in files:
-                    files.append(filepath)
-                job_update(job_id, files=files)
 
     base_opts = {
         'format': 'bestaudio/best',
@@ -179,8 +141,6 @@ def run_download(job_id, urls, quality, fmt):
     except Exception as e:
         job_update(job_id, status='error', error=str(e))
 
-
-# ── Info worker ───────────────────────────────────────────────────────────
 
 def run_info(job_id, url):
     ydl_opts = {
@@ -250,8 +210,6 @@ def run_info(job_id, url):
     except Exception as e:
         job_update(job_id, status='error', error=str(e))
 
-
-# ── Routes ────────────────────────────────────────────────────────────────
 
 @app.route('/')
 def index():
