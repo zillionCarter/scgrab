@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SC Grab — SoundCloud Downloader</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --orange: #ff5500;
+    --orange-dim: #cc4400;
+    --orange-glow: rgba(255,85,0,0.25);
+    --bg: #080808;
+    --surface: #111;
+    --surface2: #1a1a1a;
+    --border: #242424;
+    --text: #efefef;
+    --muted: #555;
+    --green: #00e676;
+    --red: #ff3d3d;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 40px 20px;
+  }
+
+  /* Animated grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,85,0,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,85,0,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+  }
+
+  .wrap {
+    width: 100%;
+    max-width: 620px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ── HEADER ── */
+  header {
+    margin-bottom: 44px;
+    animation: enterDown .5s ease both;
+  }
+
+  .logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(64px, 15vw, 100px);
+    color: var(--orange);
+    line-height: 1;
+    letter-spacing: 2px;
+    text-shadow: 0 0 60px var(--orange-glow), 3px 3px 0 var(--orange-dim);
+  }
+
+  .logo span { color: var(--text); }
+
+  .sub {
+    font-size: 11px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-top: 6px;
+  }
+
+  /* ── CARD ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 32px;
+    animation: enterUp .5s .15s ease both;
+  }
+
+  @keyframes enterDown {
+    from { opacity:0; transform:translateY(-16px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+  @keyframes enterUp {
+    from { opacity:0; transform:translateY(16px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+
+  .field { margin-bottom: 20px; }
+
+  label {
+    display: block;
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--orange);
+    margin-bottom: 8px;
+  }
+
+  input[type="text"],
+  select {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    padding: 13px 16px;
+    outline: none;
+    transition: border-color .2s, box-shadow .2s;
+    appearance: none;
+  }
+
+  input[type="text"]:focus,
+  select:focus {
+    border-color: var(--orange);
+    box-shadow: 0 0 0 3px var(--orange-glow);
+  }
+
+  input::placeholder { color: var(--muted); }
+
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+  .select-wrap {
+    position: relative;
+  }
+  .select-wrap::after {
+    content: '▾';
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted);
+    pointer-events: none;
+    font-size: 12px;
+  }
+
+  /* ── BUTTON ── */
+  .btn {
+    width: 100%;
+    padding: 16px;
+    background: var(--orange);
+    border: none;
+    border-radius: 4px;
+    color: #fff;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    letter-spacing: 3px;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: background .15s, transform .1s, box-shadow .2s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn:hover {
+    background: #ff6a1f;
+    box-shadow: 0 0 30px var(--orange-glow);
+    transform: translateY(-1px);
+  }
+
+  .btn:active { transform: translateY(1px); }
+
+  .btn:disabled {
+    background: var(--surface2);
+    color: var(--muted);
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+
+  /* ── STATUS BOX ── */
+  #status-box {
+    margin-top: 24px;
+    display: none;
+    animation: enterUp .3s ease both;
+  }
+
+  .status-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--orange);
+    animation: pulse 1s ease infinite;
+    flex-shrink: 0;
+  }
+  .status-dot.done  { background: var(--green); animation: none; }
+  .status-dot.error { background: var(--red);   animation: none; }
+
+  @keyframes pulse {
+    0%,100% { opacity:1; transform:scale(1); }
+    50%      { opacity:.4; transform:scale(.7); }
+  }
+
+  .status-text {
+    font-size: 12px;
+    color: var(--muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Progress bar */
+  .progress-track {
+    height: 3px;
+    background: var(--surface2);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: var(--orange);
+    border-radius: 2px;
+    transition: width .4s ease;
+    box-shadow: 0 0 8px var(--orange-glow);
+  }
+
+  /* File list */
+  #file-list { display: none; }
+
+  .file-list-title {
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--orange);
+    margin-bottom: 12px;
+  }
+
+  .file-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin-bottom: 8px;
+    gap: 12px;
+    animation: enterUp .3s ease both;
+  }
+
+  .file-name {
+    font-size: 12px;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+  }
+
+  .dl-btn {
+    background: none;
+    border: 1px solid var(--orange);
+    border-radius: 3px;
+    color: var(--orange);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    padding: 5px 12px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background .15s, color .15s;
+    flex-shrink: 0;
+  }
+
+  .dl-btn:hover { background: var(--orange); color: #fff; }
+
+  .zip-btn {
+    width: 100%;
+    padding: 13px;
+    background: var(--surface2);
+    border: 1px solid var(--orange);
+    border-radius: 4px;
+    color: var(--orange);
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 18px;
+    letter-spacing: 2px;
+    cursor: pointer;
+    margin-top: 12px;
+    transition: background .15s, color .15s;
+  }
+
+  .zip-btn:hover { background: var(--orange); color: #fff; }
+
+  .error-msg {
+    background: rgba(255,61,61,0.08);
+    border: 1px solid rgba(255,61,61,0.3);
+    border-radius: 4px;
+    padding: 14px;
+    font-size: 12px;
+    color: var(--red);
+    line-height: 1.5;
+    word-break: break-all;
+  }
+
+  /* Footer */
+  footer {
+    text-align: center;
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 36px;
+    letter-spacing: 1px;
+    animation: enterUp .5s .3s ease both;
+  }
+
+  footer a { color: var(--orange); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="logo">SC<span>grab</span></div>
+    <div class="sub">SoundCloud Playlist &amp; Track Downloader</div>
+  </header>
+
+  <div class="card">
+    <div class="field">
+      <label>SoundCloud URL</label>
+      <input type="text" id="url" placeholder="https://soundcloud.com/artist/sets/playlist-name" autocomplete="off">
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label>Format</label>
+        <div class="select-wrap">
+          <select id="format">
+            <option value="mp3">MP3</option>
+            <option value="original">Original (m4a/opus)</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>Quality</label>
+        <div class="select-wrap">
+          <select id="quality">
+            <option value="320">320 kbps</option>
+            <option value="192" selected>192 kbps</option>
+            <option value="128">128 kbps</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn" id="dl-btn" onclick="startDownload()">Download</button>
+
+    <div id="status-box">
+      <div class="status-header">
+        <div class="status-dot" id="status-dot"></div>
+        <div class="status-text" id="status-text">Starting download...</div>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+      </div>
+    </div>
+
+    <div id="file-list">
+      <div class="file-list-title">Downloaded Files</div>
+      <div id="files-container"></div>
+    </div>
+  </div>
+
+  <footer>
+    Files are auto-deleted after 5 minutes &nbsp;·&nbsp;
+    For personal/fair use only &nbsp;·&nbsp;
+    Powered by <a href="https://github.com/yt-dlp/yt-dlp" target="_blank">yt-dlp</a>
+  </footer>
+</div>
+
+<script>
+let pollInterval = null;
+let currentJobId = null;
+
+async function startDownload() {
+  const url = document.getElementById('url').value.trim();
+  const format = document.getElementById('format').value;
+  const quality = document.getElementById('quality').value;
+
+  if (!url) {
+    shake(document.getElementById('url'));
+    return;
+  }
+
+  // Reset UI
+  document.getElementById('dl-btn').disabled = true;
+  document.getElementById('status-box').style.display = 'block';
+  document.getElementById('file-list').style.display = 'none';
+  document.getElementById('files-container').innerHTML = '';
+  setStatus('queued', 'Connecting to SoundCloud...', 0);
+
+  try {
+    const res = await fetch('/api/download', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, format, quality })
+    });
+    const data = await res.json();
+
+    if (data.error) {
+      setStatus('error', data.error, 0);
+      document.getElementById('dl-btn').disabled = false;
+      return;
+    }
+
+    currentJobId = data.job_id;
+    pollInterval = setInterval(pollStatus, 1200);
+
+  } catch (err) {
+    setStatus('error', 'Network error: ' + err.message, 0);
+    document.getElementById('dl-btn').disabled = false;
+  }
+}
+
+async function pollStatus() {
+  if (!currentJobId) return;
+  try {
+    const res = await fetch(`/api/status/${currentJobId}`);
+    const data = await res.json();
+
+    if (data.status === 'downloading') {
+      const pct = data.progress || 0;
+      const file = data.current_file ? `↓ ${data.current_file}` : 'Downloading...';
+      setStatus('downloading', file, pct);
+
+    } else if (data.status === 'done') {
+      clearInterval(pollInterval);
+      setStatus('done', `✓ Done — ${data.file_names.length} file(s) ready`, 100);
+      showFiles(data.file_names, data.has_zip);
+      document.getElementById('dl-btn').disabled = false;
+
+    } else if (data.status === 'error') {
+      clearInterval(pollInterval);
+      setStatus('error', data.error || 'Unknown error', 0);
+      document.getElementById('dl-btn').disabled = false;
+    }
+  } catch (err) {
+    clearInterval(pollInterval);
+    setStatus('error', 'Lost connection to server', 0);
+    document.getElementById('dl-btn').disabled = false;
+  }
+}
+
+function setStatus(type, text, progress) {
+  const dot = document.getElementById('status-dot');
+  dot.className = 'status-dot';
+  if (type === 'done')  dot.classList.add('done');
+  if (type === 'error') dot.classList.add('error');
+
+  document.getElementById('status-text').textContent = text;
+  document.getElementById('progress-fill').style.width = progress + '%';
+
+  if (type === 'error') {
+    const box = document.getElementById('status-box');
+    const existing = box.querySelector('.error-msg');
+    if (existing) existing.remove();
+    const err = document.createElement('div');
+    err.className = 'error-msg';
+    err.textContent = text;
+    box.appendChild(err);
+  }
+}
+
+function showFiles(fileNames, hasZip) {
+  const container = document.getElementById('files-container');
+  const fileList = document.getElementById('file-list');
+  container.innerHTML = '';
+  fileList.style.display = 'block';
+
+  fileNames.forEach((name, i) => {
+    const item = document.createElement('div');
+    item.className = 'file-item';
+    item.innerHTML = `
+      <span class="file-name" title="${name}">${name}</span>
+      <button class="dl-btn" onclick="downloadFile(${i})">↓ Save</button>
+    `;
+    container.appendChild(item);
+  });
+
+  if (hasZip && fileNames.length > 1) {
+    const zipBtn = document.createElement('button');
+    zipBtn.className = 'zip-btn';
+    zipBtn.textContent = `↓ Download All as ZIP`;
+    zipBtn.onclick = downloadZip;
+    container.appendChild(zipBtn);
+  }
+}
+
+function downloadFile(index) {
+  window.location.href = `/api/download-file/${currentJobId}/${index}`;
+}
+
+function downloadZip() {
+  window.location.href = `/api/download-zip/${currentJobId}`;
+}
+
+function shake(el) {
+  el.style.animation = 'none';
+  el.style.borderColor = 'var(--red)';
+  setTimeout(() => { el.style.borderColor = ''; }, 1000);
+}
+
+// Allow Enter key to trigger download
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('url').addEventListener('keydown', e => {
+    if (e.key === 'Enter') startDownload();
+  });
+});
+</script>
+</body>
+</html>
