@@ -3,6 +3,8 @@ import uuid
 import threading
 import time
 import zipfile
+import sqlite3
+import json
 from flask import Flask, request, jsonify, send_file, render_template
 import yt_dlp
 
@@ -11,21 +13,72 @@ app = Flask(__name__)
 DOWNLOAD_DIR = os.path.join(os.path.dirname(__file__), 'downloads')
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
-# In-memory job store { job_id: { status, progress, files, error } }
-jobs = {}
+DB_PATH = os.path.join(os.path.dirname(__file__), 'jobs.db')
+_db_lock = threading.Lock()
+
+
+# ── DB helpers ────────────────────────────────────────────────────────────
+
+def db_init():
+    with sqlite3.connect(DB_PATH) as con:
+        con.execute('''
+            CREATE TABLE IF NOT EXISTS jobs (
+                id TEXT PRIMARY KEY,
+                data TEXT NOT NULL
+            )
+        ''')
+        con.commit()
+
+db_init()
+
+
+def job_get(job_id):
+    with _db_lock:
+        with sqlite3.connect(DB_PATH) as con:
+            row = con.execute('SELECT data FROM jobs WHERE id=?', (job_id,)).fetchone()
+    if row:
+        return json.loads(row[0])
+    return None
+
+
+def job_set(job_id, data):
+    with _db_lock:
+        with sqlite3.connect(DB_PATH) as con:
+            con.execute(
+                'INSERT OR REPLACE INTO jobs (id, data) VALUES (?, ?)',
+                (job_id, json.dumps(data))
+            )
+            con.commit()
+
+
+def job_update(job_id, **kwargs):
+    data = job_get(job_id) or {}
+    data.update(kwargs)
+    job_set(job_id, data)
+
+
+def job_delete(job_id):
+    with _db_lock:
+        with sqlite3.connect(DB_PATH) as con:
+            con.execute('DELETE FROM jobs WHERE id=?', (job_id,))
+            con.commit()
+
+
+# ── Utilities ─────────────────────────────────────────────────────────────
+
+def get_proxy():
+    return os.environ.get('PROXY_URL') or None
 
 
 def cleanup_job(job_id, delay=300):
-    """Delete downloaded files after delay seconds."""
     def _cleanup():
         time.sleep(delay)
-        job = jobs.get(job_id, {})
+        job = job_get(job_id) or {}
         for f in job.get('files', []):
             try:
                 os.remove(f)
             except Exception:
                 pass
-        # Also clean up job directory
         job_dir = os.path.join(DOWNLOAD_DIR, job_id)
         try:
             if os.path.isdir(job_dir):
@@ -33,33 +86,33 @@ def cleanup_job(job_id, delay=300):
                 shutil.rmtree(job_dir, ignore_errors=True)
         except Exception:
             pass
-        jobs.pop(job_id, None)
+        job_delete(job_id)
     threading.Thread(target=_cleanup, daemon=True).start()
 
 
-def get_proxy():
-    return os.environ.get('PROXY_URL') or None
-
+# ── Download worker ───────────────────────────────────────────────────────
 
 def run_download(job_id, urls, quality, fmt):
-    job = jobs[job_id]
     job_dir = os.path.join(DOWNLOAD_DIR, job_id)
     os.makedirs(job_dir, exist_ok=True)
-
-    downloaded_files = []
 
     def progress_hook(d):
         if d['status'] == 'downloading':
             total = d.get('total_bytes') or d.get('total_bytes_estimate') or 0
             downloaded = d.get('downloaded_bytes', 0)
             percent = int(downloaded / total * 100) if total else 0
-            filename = d.get('filename', '')
-            job['progress'] = percent
-            job['current_file'] = os.path.basename(filename)
+            job_update(job_id,
+                progress=percent,
+                current_file=os.path.basename(d.get('filename', ''))
+            )
         elif d['status'] == 'finished':
             filepath = d.get('filename', '')
             if filepath and os.path.exists(filepath):
-                downloaded_files.append(filepath)
+                job = job_get(job_id) or {}
+                files = job.get('files', [])
+                if filepath not in files:
+                    files.append(filepath)
+                job_update(job_id, files=files)
 
     base_opts = {
         'format': 'bestaudio/best',
@@ -84,49 +137,52 @@ def run_download(job_id, urls, quality, fmt):
         }]
 
     try:
-        job['status'] = 'downloading'
+        job_update(job_id, status='downloading')
+
         with yt_dlp.YoutubeDL(base_opts) as ydl:
             ydl.download(urls)
 
-        # Collect all files in job_dir
         all_files = [
             os.path.join(job_dir, f)
             for f in os.listdir(job_dir)
             if os.path.isfile(os.path.join(job_dir, f))
         ]
 
-        # Catch silent failures — ignoreerrors means no exception is raised
         if not all_files:
-            job['status'] = 'error'
-            job['error'] = (
-                'No files were downloaded. SoundCloud may be geo-blocking this server. '
-                'Set the PROXY_URL environment variable to a working proxy and try again.'
+            job_update(job_id,
+                status='error',
+                error=(
+                    'No files were downloaded. SoundCloud may be geo-blocking this server. '
+                    'Check that PROXY_URL is set correctly in your Render environment variables.'
+                )
             )
             return
 
-        job['files'] = all_files
-        job['file_names'] = [os.path.basename(f) for f in all_files]
-        job['status'] = 'done'
-        job['progress'] = 100
-
-        # Zip multiple files
+        zip_path = None
         if len(all_files) > 1:
             zip_path = os.path.join(DOWNLOAD_DIR, f'{job_id}.zip')
             with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
                 for f in all_files:
                     zf.write(f, os.path.basename(f))
-            job['zip'] = zip_path
-            job['files'].append(zip_path)
+            all_files.append(zip_path)
+
+        job_update(job_id,
+            status='done',
+            progress=100,
+            files=all_files,
+            file_names=[os.path.basename(f) for f in all_files if not f.endswith('.zip')],
+            zip=zip_path,
+        )
 
         cleanup_job(job_id)
 
     except Exception as e:
-        job['status'] = 'error'
-        job['error'] = str(e)
+        job_update(job_id, status='error', error=str(e))
 
+
+# ── Info worker ───────────────────────────────────────────────────────────
 
 def run_info(job_id, url):
-    job = jobs[job_id]
     ydl_opts = {
         'extract_flat': False,
         'quiet': True,
@@ -138,16 +194,18 @@ def run_info(job_id, url):
         ydl_opts['proxy'] = proxy
 
     try:
-        job['status'] = 'downloading'
+        job_update(job_id, status='downloading')
+
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
 
-        # Catch silent failure — ignoreerrors returns None instead of raising
         if info is None:
-            job['status'] = 'error'
-            job['error'] = (
-                'Could not fetch playlist info. SoundCloud may be geo-blocking this server. '
-                'Set the PROXY_URL environment variable and try again.'
+            job_update(job_id,
+                status='error',
+                error=(
+                    'Could not fetch playlist info. SoundCloud may be geo-blocking this server. '
+                    'Check that PROXY_URL is set correctly in your Render environment variables.'
+                )
             )
             return
 
@@ -178,19 +236,22 @@ def run_info(job_id, url):
                 'thumbnail': thumbnail,
             })
 
-        job['playlist_data'] = {
-            'title': playlist_title,
-            'uploader': uploader,
-            'count': len(tracks),
-            'thumbnail': thumbnail,
-            'tracks': tracks,
-        }
-        job['status'] = 'done'
+        job_update(job_id,
+            status='done',
+            playlist_data={
+                'title': playlist_title,
+                'uploader': uploader,
+                'count': len(tracks),
+                'thumbnail': thumbnail,
+                'tracks': tracks,
+            }
+        )
 
     except Exception as e:
-        job['status'] = 'error'
-        job['error'] = str(e)
+        job_update(job_id, status='error', error=str(e))
 
+
+# ── Routes ────────────────────────────────────────────────────────────────
 
 @app.route('/')
 def index():
@@ -207,7 +268,7 @@ def fetch_playlist():
         return jsonify({'error': 'Only SoundCloud URLs are supported'}), 400
 
     job_id = str(uuid.uuid4())
-    jobs[job_id] = {
+    job_set(job_id, {
         'type': 'info',
         'status': 'queued',
         'progress': 0,
@@ -215,7 +276,7 @@ def fetch_playlist():
         'file_names': [],
         'error': None,
         'playlist_data': None,
-    }
+    })
 
     threading.Thread(target=run_info, args=(job_id, url), daemon=True).start()
     return jsonify({'job_id': job_id})
@@ -238,7 +299,7 @@ def start_download():
     fmt = data.get('format', 'mp3')
 
     job_id = str(uuid.uuid4())
-    jobs[job_id] = {
+    job_set(job_id, {
         'status': 'queued',
         'progress': 0,
         'current_file': '',
@@ -246,7 +307,7 @@ def start_download():
         'file_names': [],
         'error': None,
         'zip': None,
-    }
+    })
 
     threading.Thread(target=run_download, args=(job_id, urls, quality, fmt), daemon=True).start()
     return jsonify({'job_id': job_id})
@@ -254,7 +315,7 @@ def start_download():
 
 @app.route('/api/status/<job_id>')
 def job_status(job_id):
-    job = jobs.get(job_id)
+    job = job_get(job_id)
     if not job:
         return jsonify({'error': 'Job not found'}), 404
 
@@ -272,7 +333,7 @@ def job_status(job_id):
     return jsonify({
         'type': 'download',
         'status': job['status'],
-        'progress': job['progress'],
+        'progress': job.get('progress', 0),
         'current_file': job.get('current_file', ''),
         'file_names': job.get('file_names', []),
         'has_zip': bool(job.get('zip')),
@@ -282,7 +343,7 @@ def job_status(job_id):
 
 @app.route('/api/download-zip/<job_id>')
 def download_zip(job_id):
-    job = jobs.get(job_id)
+    job = job_get(job_id)
     if not job or not job.get('zip'):
         return jsonify({'error': 'No zip available'}), 404
     return send_file(job['zip'], as_attachment=True, download_name='soundcloud_playlist.zip')
@@ -290,7 +351,7 @@ def download_zip(job_id):
 
 @app.route('/api/download-file/<job_id>/<int:file_index>')
 def download_file(job_id, file_index):
-    job = jobs.get(job_id)
+    job = job_get(job_id)
     if not job or file_index >= len(job.get('files', [])):
         return jsonify({'error': 'File not found'}), 404
     filepath = job['files'][file_index]
