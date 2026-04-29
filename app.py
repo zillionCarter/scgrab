@@ -27,7 +27,7 @@ def cleanup_job(job_id, delay=300):
     threading.Thread(target=_cleanup, daemon=True).start()
 
 
-def run_download(job_id, url, quality, fmt):
+def run_download(job_id, urls, quality, fmt):
     job = jobs[job_id]
     job_dir = os.path.join(DOWNLOAD_DIR, job_id)
     os.makedirs(job_dir, exist_ok=True)
@@ -47,18 +47,19 @@ def run_download(job_id, url, quality, fmt):
             if filepath and os.path.exists(filepath):
                 downloaded_files.append(filepath)
 
-    if fmt == 'mp3':
+    if fmt in ['mp3', 'wav']:
         ydl_opts = {
             'format': 'bestaudio/best',
             'outtmpl': os.path.join(job_dir, '%(title)s.%(ext)s'),
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
+                'preferredcodec': fmt,
                 'preferredquality': quality,
             }],
             'noplaylist': False,
             'progress_hooks': [progress_hook],
             'quiet': True,
+            'ignoreerrors': True,
         }
     else:
         # Keep original format (m4a / opus)
@@ -68,12 +69,17 @@ def run_download(job_id, url, quality, fmt):
             'noplaylist': False,
             'progress_hooks': [progress_hook],
             'quiet': True,
+            'ignoreerrors': True,
         }
+
+    proxy = os.environ.get('PROXY_URL')
+    if proxy:
+        ydl_opts['proxy'] = proxy
 
     try:
         job['status'] = 'downloading'
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
+            ydl.download(urls)
 
         # Collect all files in job_dir
         all_files = [os.path.join(job_dir, f) for f in os.listdir(job_dir)]
@@ -104,17 +110,106 @@ def index():
     return render_template('index.html')
 
 
-@app.route('/api/download', methods=['POST'])
-def start_download():
+def run_info(job_id, url):
+    job = jobs[job_id]
+    ydl_opts = {
+        'extract_flat': False,
+        'quiet': True,
+        'ignoreerrors': True,
+    }
+    proxy = os.environ.get('PROXY_URL')
+    if proxy:
+        ydl_opts['proxy'] = proxy
+
+    try:
+        job['status'] = 'downloading' # Use 'downloading' so frontend shows it's active
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+
+        playlist_title = info.get('title') or 'SoundCloud Audio'
+        uploader = info.get('uploader') or info.get('channel') or ''
+        thumbnail = info.get('thumbnail') or ''
+
+        tracks = []
+        if 'entries' in info:
+            for t in info['entries']:
+                if not t:
+                    continue
+                t_url = t.get('webpage_url') or t.get('url')
+                if t_url:
+                    tracks.append({
+                        'title': t.get('title') or 'Unknown Track',
+                        'url': t_url,
+                        'uploader': t.get('uploader') or uploader,
+                        'duration': t.get('duration'),
+                        'thumbnail': t.get('thumbnail') or thumbnail
+                    })
+        else:
+            tracks.append({
+                'title': playlist_title,
+                'url': info.get('webpage_url') or url,
+                'uploader': uploader,
+                'duration': info.get('duration'),
+                'thumbnail': thumbnail
+            })
+
+        job['playlist_data'] = {
+            'title': playlist_title,
+            'uploader': uploader,
+            'count': len(tracks),
+            'thumbnail': thumbnail,
+            'tracks': tracks
+        }
+        job['status'] = 'done'
+    except Exception as e:
+        job['status'] = 'error'
+        job['error'] = str(e)
+
+
+@app.route('/api/fetch-playlist', methods=['POST'])
+def fetch_playlist():
     data = request.get_json()
     url = (data.get('url') or '').strip()
-    quality = data.get('quality', '192')
-    fmt = data.get('format', 'mp3')
-
     if not url:
         return jsonify({'error': 'No URL provided'}), 400
     if 'soundcloud.com' not in url:
         return jsonify({'error': 'Only SoundCloud URLs are supported'}), 400
+
+    job_id = str(uuid.uuid4())
+    jobs[job_id] = {
+        'type': 'info',
+        'status': 'queued',
+        'progress': 0,
+        'current_file': 'Fetching metadata...',
+        'file_names': [],
+        'error': None,
+        'playlist_data': None
+    }
+
+    t = threading.Thread(target=run_info, args=(job_id, url), daemon=True)
+    t.start()
+
+    return jsonify({'job_id': job_id})
+
+
+@app.route('/api/download', methods=['POST'])
+def start_download():
+    data = request.get_json()
+    urls = data.get('urls')
+    
+    if not urls or not isinstance(urls, list):
+        url = data.get('url')
+        if url:
+            urls = [url]
+        else:
+            return jsonify({'error': 'No URLs provided'}), 400
+
+    urls = [u.strip() for u in urls if u and 'soundcloud.com' in u]
+    if not urls:
+        return jsonify({'error': 'Only valid SoundCloud URLs are supported'}), 400
+
+    quality = data.get('quality', '192')
+    fmt = data.get('format', 'mp3')
 
     job_id = str(uuid.uuid4())
     jobs[job_id] = {
@@ -127,7 +222,7 @@ def start_download():
         'zip': None,
     }
 
-    t = threading.Thread(target=run_download, args=(job_id, url, quality, fmt), daemon=True)
+    t = threading.Thread(target=run_download, args=(job_id, urls, quality, fmt), daemon=True)
     t.start()
 
     return jsonify({'job_id': job_id})
@@ -138,7 +233,20 @@ def job_status(job_id):
     job = jobs.get(job_id)
     if not job:
         return jsonify({'error': 'Job not found'}), 404
+        
+    if job.get('type') == 'info':
+        return jsonify({
+            'type': 'info',
+            'status': job['status'],
+            'progress': job.get('progress', 0),
+            'current_file': job.get('current_file', ''),
+            'file_names': [],
+            'error': job.get('error'),
+            'playlist_data': job.get('playlist_data')
+        })
+        
     return jsonify({
+        'type': 'download',
         'status': job['status'],
         'progress': job['progress'],
         'current_file': job.get('current_file', ''),
