@@ -790,6 +790,14 @@ async function pollStatus() {
     const res = await fetch(`/api/status/${currentJobId}`);
     const data = await res.json();
 
+    if (data.error && !data.status) {
+      clearInterval(pollInterval);
+      setProgress('error', data.error, 0, '');
+      document.getElementById('fetch-btn').disabled = false;
+      document.getElementById('dl-btn').disabled = false;
+      return;
+    }
+
     if (data.type === 'info') {
       if (data.status === 'downloading') {
         // Still fetching info
